@@ -1,0 +1,229 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Sistema de atención – Servicios escolares</title>
+
+  <style>
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      font-family: Arial, Helvetica, sans-serif;
+      background: #f2f4f7;
+      color: #222;
+    }
+
+    .contenedor {
+      max-width: 800px;
+      margin: 0 auto;
+      padding: 20px;
+    }
+
+    /* Encabezado */
+    .encabezado {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 16px;
+      margin-bottom: 20px;
+    }
+    .encabezado h1 { margin: 0; font-size: 24px; }
+    .encabezado p { margin: 4px 0 0; color: #666; }
+    .contador {
+      background: #1f4e9c;
+      color: #fff;
+      border-radius: 8px;
+      padding: 10px 18px;
+      text-align: center;
+    }
+    .contador strong { display: block; font-size: 28px; }
+    .contador span { font-size: 13px; }
+
+    /* Tarjetas */
+    .tarjeta {
+      background: #fff;
+      border-radius: 8px;
+      padding: 20px;
+      margin-bottom: 20px;
+      box-shadow: 0 1px 3px rgba(0, 0, 0, 0.12);
+    }
+    .tarjeta h2 { margin: 0 0 15px; font-size: 18px; }
+
+    /* Mensajes */
+    .msg {
+      margin: 0 0 10px;
+      padding: 12px 15px;
+      border-radius: 6px;
+      font-size: 15px;
+    }
+    .msg.ok     { background: #dff3e6; color: #1b5e37; }
+    .msg.info   { background: #e1ebfa; color: #1f4e9c; }
+    .msg.error,
+    .msg.alerta { background: #fde4e2; color: #b3261e; }
+
+    /* Formulario */
+    .campos {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+    }
+    label { font-size: 14px; font-weight: bold; }
+    input, select {
+      width: 100%;
+      margin-top: 4px;
+      padding: 9px;
+      font-size: 15px;
+      border: 1px solid #bbb;
+      border-radius: 6px;
+      background: #fff;
+    }
+    button {
+      padding: 10px 18px;
+      font-size: 15px;
+      font-weight: bold;
+      border: none;
+      border-radius: 6px;
+      cursor: pointer;
+      background: #1f4e9c;
+      color: #fff;
+    }
+    button:hover { background: #163a75; }
+    button.secundario { background: #e4e7ec; color: #222; }
+    button.secundario:hover { background: #d3d7de; }
+    .campos button { grid-column: 1 / -1; }
+
+    /* Al frente de la fila */
+    .frente { border-left: 6px solid #f0a500; }
+    .frente .nombre { margin: 0 0 6px; font-size: 22px; font-weight: bold; }
+    .frente .datos { margin: 0 0 15px; color: #444; line-height: 1.6; }
+    .acciones { display: flex; gap: 10px; flex-wrap: wrap; }
+    .acciones form { margin: 0; }
+    .ultimo { margin: 15px 0 0; font-size: 14px; color: #666; }
+
+    /* Lista */
+    ol { margin: 0; padding-left: 22px; }
+    li { padding: 10px 0; border-bottom: 1px solid #eee; }
+    li:last-child { border-bottom: none; }
+    li small { color: #666; }
+    .vacio { color: #666; margin: 0; }
+
+    @media (max-width: 600px) {
+      .campos { grid-template-columns: 1fr; }
+      .encabezado { flex-direction: column; align-items: flex-start; }
+    }
+  </style>
+</head>
+<body>
+
+<div class="contenedor">
+
+  <div class="encabezado">
+    <div>
+      <h1>Ventanilla de servicios escolares</h1>
+      <p>Los estudiantes se atienden en el orden en que llegaron.</p>
+    </div>
+    <div class="contador">
+      <strong>{{ total }}</strong>
+      <span>esperando</span>
+    </div>
+  </div>
+
+  <!-- Mensajes del sistema -->
+  {% with mensajes = get_flashed_messages(with_categories=true) %}
+    {% for categoria, texto in mensajes %}
+    <p class="msg {{ categoria }}">{{ texto }}</p>
+    {% endfor %}
+  {% endwith %}
+
+  <!-- a) Agregar estudiante -->
+  <div class="tarjeta">
+    <h2>Agregar estudiante</h2>
+    <form action="{{ url_for('agregar') }}" method="post">
+      <div class="campos">
+        <label>Matrícula
+          <input type="text" name="matricula" inputmode="numeric" value="{{ datos.get('matricula', '') }}" required>
+        </label>
+        <label>Nombre completo
+          <input type="text" name="nombre" value="{{ datos.get('nombre', '') }}" required>
+        </label>
+        <label>Carrera
+          <input type="text" name="carrera" value="{{ datos.get('carrera', '') }}" required>
+        </label>
+        <label>Trámite
+          <select name="tramite" required>
+            <option value="">Selecciona un trámite</option>
+            {% for t in tramites %}
+            <option value="{{ t }}"{{ ' selected' if datos.get('tramite') == t else '' }}>{{ t }}</option>
+            {% endfor %}
+          </select>
+        </label>
+        <button type="submit">Agregar a la fila</button>
+      </div>
+    </form>
+  </div>
+
+  <!-- b) y c) Estudiante al frente -->
+  <div class="tarjeta frente">
+    <h2>Al frente de la fila</h2>
+
+    {% if siguiente %}
+    <p class="nombre">{{ siguiente.nombre }}</p>
+    <p class="datos">
+      Matrícula: {{ siguiente.matricula }}<br>
+      Carrera: {{ siguiente.carrera }}<br>
+      Trámite: {{ siguiente.tramite }}
+    </p>
+    {% else %}
+    <p class="vacio">Nadie en espera.</p>
+    {% endif %}
+
+    <div class="acciones">
+      <form action="{{ url_for('atender') }}" method="post">
+        <button type="submit">Atender estudiante</button>
+      </form>
+      <form action="{{ url_for('siguiente') }}" method="post">
+        <button type="submit" class="secundario">Consultar siguiente</button>
+      </form>
+    </div>
+
+    {% if ultimo %}
+    <p class="ultimo">Último atendido: {{ ultimo }}.</p>
+    {% endif %}
+  </div>
+
+  <!-- d) Estudiantes en espera -->
+  <div class="tarjeta">
+    <h2>Estudiantes en espera</h2>
+
+    {% if estudiantes %}
+    <ol>
+      {% for e in estudiantes %}
+      <li>
+        <strong>{{ e.nombre }}</strong> – {{ e.tramite }}<br>
+        <small>Matrícula {{ e.matricula }} – {{ e.carrera }}</small>
+      </li>
+      {% endfor %}
+    </ol>
+    {% else %}
+    <p class="vacio">La fila está vacía.</p>
+    {% endif %}
+  </div>
+
+</div>
+
+<!-- f) Alerta de fila vacía -->
+<script>
+  window.addEventListener("load", function () {
+    var avisos = document.querySelectorAll(".msg.alerta");
+    if (avisos.length > 0) {
+      setTimeout(function () {
+        alert(avisos[avisos.length - 1].textContent.trim());
+      }, 50);
+    }
+  });
+</script>
+
+</body>
+</html>
